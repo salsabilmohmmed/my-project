@@ -25,3 +25,86 @@ connection.connect((err) => {
     connection.end();
   });
 });
+const { exec } = require('child_process');
+const sshServer = require('ssh2').Server;
+
+const server = new sshServer({
+  hostKeys: [fs.readFileSync('/path/to/private/key.pem')],
+});
+
+server.on('connection', (client, info) => {
+  // تنفيذ إجراءات التحقق هنا (مثل التحقق من المفتاح أو كلمة المرور)
+
+  client.on('authentication', (ctx) => {
+    if (ctx.method === 'password' && ctx.username === 'your_username' && ctx.password === 'your_password') {
+      ctx.accept();
+    } else {
+      ctx.reject();
+    }
+  });
+
+  // تنفيذ الأوامر أو العمليات المطلوبة
+  client.on('session', (accept, reject) => {
+    const session = accept();
+    session.once('exec', (accept, reject, info) => {
+      const process = exec(info.command, (error, stdout, stderr) => {
+        if (error) {
+          reject();
+        } else {
+          accept();
+          session.stdout.write(stdout);
+          session.stderr.write(stderr);
+          session.exit(0);
+          session.end();
+        }
+      });
+    });
+  });
+
+  // الاحتفاظ بقائمة الاتصالات النشطة ومعلومات العميل المرتبطة بها
+  // يمكنك استخدام المتغيرات والمصفوفات لتخزين المعلومات المطلوبة
+});
+
+server.listen(22, 'your_server_ip', () => {
+  console.log('SSH server is running');
+});
+const Client = require('ssh2').Client;
+
+const conn = new Client();
+conn.on('ready', () => {
+  // تنفيذ الأوامر أو العمليات المطلوبة
+  conn.exec('ls -l', (err, stream) => {
+    if (err) throw err;
+    stream
+      .on('close', (code, signal) => {
+        console.log('Stream closed');
+        conn.end();
+      })
+      .on('data', (data) => {
+        console.log('STDOUT:', data.toString());
+      })
+      .stderr.on('data', (data) => {
+        console.log('STDERR:', data.toString());
+      });
+  });
+}).connect({
+  host: 'your_server_ip',
+  port: 22,
+  username: 'your_username',
+  password: 'your_password',
+  privateKey: fs.readFileSync('/path/to/private/key.pem'),
+});
+const ps = require('ps-node');
+
+// الحصول على قائمة العمليات النشطة
+ps.lookup({ command: 'sshd' }, (err, resultList) => {
+  if (err) throw new Error(err);
+
+  // طباعة معلومات العملاء المتصلين
+  resultList.forEach((process) => {
+    console.log('PID:', process.pid);
+    console.log('Username:', process.username);
+    console.log('Status:', process.status);
+    console.log('==============================');
+  });
+});
